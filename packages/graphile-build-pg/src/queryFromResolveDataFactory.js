@@ -189,7 +189,7 @@ export default (queryBuilderOptions: QueryBuilderOptions = {}) =>
        */
 
       const sqlCommonUnbounded = sql.fragment`\
-select 1
+select count(*)
 from ${queryBuilder.getTableExpression()} as ${queryBuilder.getTableAlias()}`;
       /*
        * This variable is a fragment to go into an `EXISTS(...)` call (after some tweaks).
@@ -240,11 +240,11 @@ where ${queryBuilder.buildWhereClause(!invert, invert, options)}`;
            * `before` clause.
            */
           return sql.fragment`\
-exists(
+(
   ${sqlCommonUnbounded}
   where ${queryBuilder.buildWhereClause(false, false, options)}
   and not (${queryBuilder.buildWhereBoundClause(invert)})
-)`;
+) > 0`;
         } else {
           assert(queryHasFirst);
           // queryHasBefore could be true or false.
@@ -268,11 +268,11 @@ exists(
           // Drop the `first` limit, see if there are any records that aren't
           // already in the list we've fetched.
           return sql.fragment`\
-exists(
+(
   ${sqlCommon}
   and (${queryBuilder.getSelectCursor()})::text not in (select __cursor::text from ${sqlQueryAlias})
   ${offset === 0 ? sql.blank : sql.fragment`offset ${sql.value(offset)}`}
-)`;
+) > 0`;
         }
       } else {
         assert(!invert || offset === 0); // isForwardOrSymmetric
@@ -300,8 +300,10 @@ exists(
            */
           return sql.fragment`\
 exists(
-  ${sqlCommon}
-  offset ${sql.literal(limit + offset)}
+    select count(1)
+    from ${queryBuilder.getTableExpression()} as ${queryBuilder.getTableAlias()}
+    where ${queryBuilder.buildWhereClause(!invert, invert, options)}
+    offset ${sql.literal(limit + offset)}
 )`;
         }
       }
